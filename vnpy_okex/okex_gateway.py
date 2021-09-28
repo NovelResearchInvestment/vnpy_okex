@@ -145,13 +145,13 @@ class OkexGateway(BaseGateway):
 
     def connect(self, setting: dict) -> None:
         """连接交易接口"""
-        key: str = setting["API Key"]
-        secret: str = setting["Secret Key"]
-        passphrase: str = setting["Passphrase"]
-        proxy_host: str = setting["代理地址"]
-        proxy_port: str = setting["代理端口"]
-        server: str = setting["服务器"]
-        session_number: str = setting["会话数"]
+        key: str = setting["key"]
+        secret: str = setting["secret"]
+        passphrase: str = ""
+        proxy_host: str = setting["proxy_host"]
+        proxy_port: str = setting["proxy_port"]
+        server: str = setting["server"]
+        session_number: str = setting["session_number"]
 
         if proxy_port.isdigit():
             proxy_port = int(proxy_port)
@@ -230,6 +230,7 @@ class OkexRestApi(RestClient):
 
         self.gateway: OkexGateway = gateway
         self.gateway_name: str = gateway.gateway_name
+        self.is_connected: bool = False
 
         self.key: str = ""
         self.secret: str = ""
@@ -286,7 +287,7 @@ class OkexRestApi(RestClient):
 
         self.init(REST_HOST, proxy_host, proxy_port)
         self.start(session_number)
-        self.gateway.write_log("REST API启动成功")
+        self.gateway.write_log(f"{self.gateway_name} REST API启动成功")
 
         self.query_time()
         self.query_order()
@@ -316,7 +317,7 @@ class OkexRestApi(RestClient):
             )
             self.gateway.on_order(order)
 
-        self.gateway.write_log("委托信息查询成功")
+        self.gateway.write_log(f"{self.gateway_name} 委托信息查询成功")
 
     def on_query_time(self, packet: dict, request: Request) -> None:
         """时间查询回报"""
@@ -422,6 +423,7 @@ class OkexWebsocketPublicApi(WebsocketClient):
 
         self.gateway: OkexGateway = gateway
         self.gateway_name: str = gateway.gateway_name
+        self.is_connected: bool = False
 
         self.subscribed: Dict[str, SubscribeRequest] = {}
         self.ticks: Dict[str, TickData] = {}
@@ -494,16 +496,16 @@ class OkexWebsocketPublicApi(WebsocketClient):
 
     def on_connected(self) -> None:
         """连接成功回报"""
-        self.gateway.write_log("Websocket Public API连接成功")
-
+        self.gateway.write_log(f"{self.gateway_name} Websocket Public API连接成功")
         self.query_contract()
+        self.is_connected = True
 
         for req in list(self.subscribed.values()):
             self.subscribe(req)
 
     def on_disconnected(self) -> None:
         """连接断开回报"""
-        self.gateway.write_log("Websocket Public API连接断开")
+        self.gateway.write_log(f"{self.gateway_name} Websocket Public API连接断开")
 
     def on_packet(self, packet: dict) -> None:
         """推送数据回报"""
@@ -615,6 +617,7 @@ class OkexWebsocketPrivateApi(WebsocketClient):
 
         self.gateway: OkexGateway = gateway
         self.gateway_name: str = gateway.gateway_name
+        self.is_connected: bool = False
 
         self.key: str = ""
         self.secret: str = ""
@@ -661,12 +664,13 @@ class OkexWebsocketPrivateApi(WebsocketClient):
 
     def on_connected(self) -> None:
         """连接成功回报"""
-        self.gateway.write_log("Websocket Private API连接成功")
+        self.gateway.write_log(f"{self.gateway_name} Websocket Private API连接成功")
         self.login()
+        self.is_connected = True
 
     def on_disconnected(self) -> None:
         """连接断开回报"""
-        self.gateway.write_log("Websocket Private API连接断开")
+        self.gateway.write_log(f"{self.gateway_name} Websocket Private API连接断开")
 
     def on_packet(self, packet: dict) -> None:
         """推送数据回报"""
@@ -699,10 +703,10 @@ class OkexWebsocketPrivateApi(WebsocketClient):
     def on_login(self, packet: dict) -> None:
         """用户登录请求回报"""
         if packet["code"] == '0':
-            self.gateway.write_log("Websocket Private API登录成功")
+            self.gateway.write_log(f"{self.gateway_name} Websocket Private API登录成功")
             self.subscribe_topic()
         else:
-            self.gateway.write_log("Websocket Private API登录失败")
+            self.gateway.write_log(f"{self.gateway_name} Websocket Private API登录失败")
 
     def on_order(self, packet: dict) -> None:
         """委托更新推送"""
